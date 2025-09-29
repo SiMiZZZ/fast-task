@@ -12,7 +12,7 @@ use config::Config;
 use jira_client::JiraClient;
 
 use crate::{
-    config::{load_config, save_config, LoadConfigError, CONFIG_PATH},
+    config::{CONFIG_PATH, LoadConfigError, load_config, save_config},
     jira_client::{create_issue, get_project_issue_types, test_connection},
 };
 
