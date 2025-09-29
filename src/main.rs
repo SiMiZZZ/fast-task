@@ -11,7 +11,10 @@ mod jira_client;
 use config::Config;
 use jira_client::JiraClient;
 
-use crate::config::{CONFIG_PATH, LoadConfigError, load_config, save_config};
+use crate::{
+    config::{load_config, save_config, LoadConfigError, CONFIG_PATH},
+    jira_client::{create_issue, get_project_issue_types, test_connection},
+};
 
 #[derive(Parser)]
 #[command(name = "fast-task")]
@@ -103,8 +106,7 @@ async fn main() {
             }
 
             println!("🔍 Testing Jira connection...");
-            let client = JiraClient::new(&config);
-            match client.test_connection().await {
+            match test_connection(&JiraClient::new(&config)).await {
                 Ok(_) => {
                     println!("✅ Connection successful!");
                     println!("   URL: {}", config.jira_url);
@@ -302,7 +304,7 @@ async fn interactive_create_issue(config: &Config) -> Result<String, IssueCreate
         selected_project
     );
 
-    let issue_types = match client.get_project_issue_types(&selected_project).await {
+    let issue_types = match get_project_issue_types(&client, &selected_project).await {
         Ok(types) => {
             if types.is_empty() {
                 return Err(IssueCreateError::IssueTypesNotFound(selected_project));
@@ -384,15 +386,15 @@ async fn interactive_create_issue(config: &Config) -> Result<String, IssueCreate
         return Err(IssueCreateError::Canceled);
     }
     println!("\n🚀 Creating issue...");
-    Ok(client
-        .create_issue(
-            &selected_project,
-            &title,
-            description.as_deref(),
-            selected_issue_type.id.as_str(),
-        )
-        .await
-        .map_err(|e| {
-            IssueCreateError::JiraClient(selected_option, format!("Jira client error: {:?}", e))
-        }))?
+    Ok(create_issue(
+        &client,
+        &selected_project,
+        &title,
+        description.as_deref(),
+        selected_issue_type.id.as_str(),
+    )
+    .await
+    .map_err(|e| {
+        IssueCreateError::JiraClient(selected_option, format!("Jira client error: {:?}", e))
+    }))?
 }
