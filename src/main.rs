@@ -1,4 +1,5 @@
 use core::panic;
+use thiserror::Error;
 
 use clap::{Parser, Subcommand};
 use inquire::{Confirm, Select, Text};
@@ -40,33 +41,18 @@ enum Commands {
     Create,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 enum IssueCreateError {
+    #[error("Project: {0}. Jira client error: {1}")]
     JiraClient(String, String),
+    #[error("Issue title cannot be empty")]
     EmptyTitle,
+    #[error("No issue types found for project '{0}'")]
     IssueTypesNotFound(String),
+    #[error("Failed to select an option")]
     SelectOption,
+    #[error("Operation canceled by user")]
     Canceled,
-}
-
-impl std::fmt::Display for IssueCreateError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            IssueCreateError::JiraClient(selected_project, msg) => {
-                write!(
-                    f,
-                    "Project: {}. Jira client error: {}",
-                    selected_project, msg
-                )
-            }
-            IssueCreateError::EmptyTitle => write!(f, "Issue title cannot be empty"),
-            IssueCreateError::IssueTypesNotFound(project) => {
-                write!(f, "No issue types found for project '{}'", project)
-            }
-            IssueCreateError::SelectOption => write!(f, "Failed to select an option"),
-            IssueCreateError::Canceled => write!(f, "Operation canceled by user"),
-        }
-    }
 }
 
 #[tokio::main]
@@ -88,7 +74,6 @@ async fn main() {
         Commands::Config => interactive_set_config(&config),
         Commands::AddProject => interactive_add_project(&config),
         Commands::ListProjects => {
-            let config = load_config().unwrap_or_default();
             if config.projects.is_empty() {
                 println!("No projects configured. Use 'fast-task add-project' to add one.");
             } else {

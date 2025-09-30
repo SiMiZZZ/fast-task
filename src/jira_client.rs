@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use thiserror::Error;
 
 use crate::config::Config;
 use reqwest::{Client, StatusCode};
@@ -37,25 +37,14 @@ pub struct IssueType {
     pub description: Option<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Error)]
 pub enum JiraClientError {
+    #[error("Jira Client request error: {0}")]
     Request(String),
+    #[error("Bad response, status: {0}, text: {1}")]
     Response(StatusCode, String),
+    #[error("Parse response error")]
     Parse,
-}
-
-impl Display for JiraClientError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            JiraClientError::Request(err) => write!(f, "Jira Client request error: {}", err),
-            JiraClientError::Response(status_code, error_text) => write!(
-                f,
-                "Bad response, status: {}, text: {}",
-                status_code, error_text
-            ),
-            JiraClientError::Parse => write!(f, "Parse response error"),
-        }
-    }
 }
 
 impl JiraClient {

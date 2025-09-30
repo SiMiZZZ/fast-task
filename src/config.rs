@@ -3,17 +3,23 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
+use thiserror::Error;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Error)]
 pub enum LoadConfigError {
+    #[error("Failed to read config file")]
     Read,
+    #[error("Failed to deserialize config file")]
     Deserialize,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Error)]
 pub enum SaveConfigError {
+    #[error("Failed to create config directory")]
     CreateDir,
+    #[error("Failed to serialize config")]
     Serialize,
+    #[error("Failed to save config file")]
     Save,
 }
 
