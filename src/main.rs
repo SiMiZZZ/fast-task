@@ -123,7 +123,7 @@ async fn main() {
                     println!("🔗 {}", issue_url);
                 }
                 Err(e) => {
-                    println!("❌ Failed to create issue: {:?}", e);
+                    println!("❌ Failed to create issue: {}", e);
                 }
             }
         }
@@ -182,7 +182,7 @@ fn interactive_set_config(original_config: &Config) {
             println!("Configuration saved!");
         }
         Err(err) => {
-            println!("Failed to save config: {:?}", err);
+            println!("Failed to save config: {}", err);
         }
     }
 }
@@ -228,7 +228,7 @@ fn interactive_add_project(original_config: &Config) {
             println!("Configuration saved!");
         }
         Err(err) => {
-            println!("Failed to save config: {:?}", err);
+            println!("Failed to save config: {}", err);
         }
     }
 }
@@ -304,7 +304,7 @@ async fn interactive_create_issue(config: &Config) -> Result<String, IssueCreate
         Err(e) => {
             return Err(IssueCreateError::JiraClient(
                 selected_project,
-                format!("Jira client error: {:?}", e),
+                format!("Jira client error: {}", e),
             ));
         }
     };
@@ -380,6 +380,6 @@ async fn interactive_create_issue(config: &Config) -> Result<String, IssueCreate
     )
     .await
     .map_err(|e| {
-        IssueCreateError::JiraClient(selected_option, format!("Jira client error: {:?}", e))
+        IssueCreateError::JiraClient(selected_option, format!("Jira client error: {}", e))
     }))?
 }
