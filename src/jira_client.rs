@@ -1,6 +1,7 @@
+use thiserror::Error;
+
 use crate::config::Config;
-use anyhow::{Context, Result};
-use reqwest::Client;
+use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -36,129 +37,129 @@ pub struct IssueType {
     pub description: Option<String>,
 }
 
+#[derive(Debug, Error)]
+pub enum JiraClientError {
+    #[error("Jira Client request error: {0}")]
+    Request(String),
+    #[error("Bad response, status: {0}, text: {1}")]
+    Response(StatusCode, String),
+    #[error("Parse response error")]
+    Parse,
+}
+
 impl JiraClient {
-    pub fn new(config: &Config) -> Result<Self> {
+    pub fn new(config: &Config) -> Self {
         let client = Client::new();
-
         let auth_header = format!("Bearer {}", config.api_token);
-
-        Ok(Self {
+        Self {
             client,
             config: config.clone(),
             auth_header,
-        })
+        }
     }
+}
 
-    pub async fn create_issue(
-        &self,
-        project_key: &str,
-        summary: &str,
-        description: Option<&str>,
-        issue_type_id: &str,
-    ) -> Result<String> {
-        let api_url = format!(
-            "{}/rest/api/2/issue",
-            self.config.jira_url.trim_end_matches('/')
-        );
+pub async fn create_issue(
+    jira_client: &JiraClient,
+    project_key: &str,
+    summary: &str,
+    description: Option<&str>,
+    issue_type_id: &str,
+) -> Result<String, JiraClientError> {
+    let api_url = format!(
+        "{}/rest/api/2/issue",
+        jira_client.config.jira_url.trim_end_matches('/')
+    );
 
-        let description_content = description.unwrap_or("").to_string();
+    let description_content = description.unwrap_or("").to_string();
 
-        let issue_data = json!({
-            "fields": {
-                "project": {
-                    "key": project_key
-                },
-                "summary": summary,
-                "description": description_content,
-                "issuetype": {
-                    "id": issue_type_id.to_string(),
-                }
+    let issue_data = json!({
+        "fields": {
+            "project": {
+                "key": project_key
+            },
+            "summary": summary,
+            "description": description_content,
+            "issuetype": {
+                "id": issue_type_id.to_string(),
             }
-        });
-
-        let response = self
-            .client
-            .post(&api_url)
-            .header("Authorization", &self.auth_header)
-            .header("Content-Type", "application/json")
-            .json(&issue_data)
-            .send()
-            .await
-            .context("Failed to send request to Jira API")?;
-
-        if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            return Err(anyhow::anyhow!(
-                "Jira API returned error {}: {}",
-                status,
-                error_text
-            ));
         }
+    });
 
-        let create_response: CreateIssueResponse = response
-            .json()
-            .await
-            .context("Failed to parse Jira API response")?;
+    let response = jira_client
+        .client
+        .post(&api_url)
+        .header("Authorization", &jira_client.auth_header)
+        .header("Content-Type", "application/json")
+        .json(&issue_data)
+        .send()
+        .await
+        .map_err(|err| JiraClientError::Request(err.to_string()))?;
 
-        // Возвращаем ссылку на созданную задачу
-        Ok(self.config.get_issue_url(&create_response.key))
+    if !response.status().is_success() {
+        return Err(JiraClientError::Response(
+            response.status(),
+            response.text().await.unwrap_or_default(),
+        ));
     }
 
-    pub async fn get_project_issue_types(&self, project_key: &str) -> Result<Vec<IssueType>> {
-        let api_url = format!(
-            "{}/rest/api/2/issue/createmeta/{}/issuetypes",
-            self.config.jira_url.trim_end_matches('/'),
-            project_key
-        );
+    let create_response: CreateIssueResponse =
+        response.json().await.map_err(|_| JiraClientError::Parse)?;
 
-        let response = self
-            .client
-            .get(&api_url)
-            .header("Authorization", &self.auth_header)
-            .send()
-            .await
-            .context("Failed to fetch project metadata")?;
+    // Возвращаем ссылку на созданную задачу
+    Ok(jira_client.config.issue_url(&create_response.key))
+}
 
-        if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            return Err(anyhow::anyhow!(
-                "Jira API returned error {}: {}",
-                status,
-                error_text
-            ));
-        }
+pub async fn test_connection(client: &JiraClient) -> Result<(), JiraClientError> {
+    let api_url = format!(
+        "{}/rest/api/2/myself",
+        client.config.jira_url.trim_end_matches('/')
+    );
 
-        let issue_types_response: IssueTypesResponse = response
-            .json()
-            .await
-            .context("Failed to parse issue types response")?;
+    let response = client
+        .client
+        .get(&api_url)
+        .header("Authorization", &client.auth_header)
+        .send()
+        .await
+        .map_err(|err| JiraClientError::Request(err.to_string()))?;
 
-        Ok(issue_types_response.values)
+    if response.status().is_success() {
+        Ok(())
+    } else {
+        Err(JiraClientError::Response(
+            response.status(),
+            response.text().await.unwrap_or_default(),
+        ))
+    }
+}
+
+pub async fn get_project_issue_types(
+    jira_client: &JiraClient,
+    project_key: &str,
+) -> Result<Vec<IssueType>, JiraClientError> {
+    let api_url = format!(
+        "{}/rest/api/2/issue/createmeta/{}/issuetypes",
+        jira_client.config.jira_url.trim_end_matches('/'),
+        project_key
+    );
+
+    let response = jira_client
+        .client
+        .get(&api_url)
+        .header("Authorization", &jira_client.auth_header)
+        .send()
+        .await
+        .map_err(|err| JiraClientError::Request(err.to_string()))?;
+
+    if !response.status().is_success() {
+        return Err(JiraClientError::Response(
+            response.status(),
+            response.text().await.unwrap_or_default(),
+        ));
     }
 
-    pub async fn test_connection(&self) -> Result<()> {
-        let api_url = format!(
-            "{}/rest/api/2/myself",
-            self.config.jira_url.trim_end_matches('/')
-        );
-
-        let response = self
-            .client
-            .get(&api_url)
-            .header("Authorization", &self.auth_header)
-            .send()
-            .await
-            .context("Failed to connect to Jira API")?;
-
-        if response.status().is_success() {
-            Ok(())
-        } else {
-            Err(anyhow::anyhow!(
-                "Authentication failed: HTTP {}",
-                response.status()
-            ))
-        }
-    }
+    let issue_types_response: IssueTypesResponse =
+        response.json().await.map_err(|_| JiraClientError::Parse)?;
+    Ok(issue_types_response.values)
 }
