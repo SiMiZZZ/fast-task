@@ -19,7 +19,7 @@
 
 ```bash
 # Клонируйте репозиторий
-git clone https://github.com/your-username/fast-task.git
+git clone https://github.com/SiMiZZZ/fast-task.git
 cd fast-task
 
 # Соберите проект

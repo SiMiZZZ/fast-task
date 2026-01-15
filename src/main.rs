@@ -2,7 +2,7 @@ use core::panic;
 use thiserror::Error;
 
 use clap::{Parser, Subcommand};
-use inquire::{Confirm, Select, Text};
+use inquire::{Confirm, Editor, Select, Text};
 use once_cell::sync::Lazy;
 use validator::{ValidateEmail, ValidateUrl};
 
@@ -269,9 +269,11 @@ async fn interactive_create_issue(config: &Config) -> Result<String, IssueCreate
         .expect("Cannot prompt");
 
     let description = if has_description {
-        let desc = Text::new("Issue description:")
-            .with_help_message("Provide detailed information about the issue")
-            .with_placeholder("Steps to reproduce, expected behavior, etc.")
+        let desc = Editor::new("Issue description:")
+            .with_help_message(
+                "Provide detailed information (opens editor, save and close to continue)",
+            )
+            .with_file_extension(".md")
             .prompt()
             .expect("Cannot prompt");
 
