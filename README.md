@@ -8,6 +8,7 @@
 - 📋 **Управление проектами** - добавление и просмотр ваших проектов
 - 🎯 **Создание задач** - интерактивное создание задач с выбором реальных типов из API
 - 🔍 **Проверка соединения** - тестирование подключения к Jira
+- 📌 **Мои задачи** - просмотр всех задач, назначенных на вас, прямо в терминале
 - ⚡ **Быстрота** - мгновенное создание задач без ожидания загрузки веб-интерфейса
 
 ## 🚀 Установка
@@ -69,6 +70,7 @@ fast-task create
 | `fast-task list-projects` | Просмотр настроенных проектов |
 | `fast-task test` | Проверка соединения с Jira |
 | `fast-task create` | Создание новой задачи |
+| `fast-task my-issues` | Просмотр задач, назначенных на вас |
 
 ## 💡 Примеры использования
 
@@ -88,6 +90,32 @@ Configured projects:
   WEB - Company Website
   API - Backend API
   MOBILE - Mobile App
+```
+
+### Просмотр назначенных задач
+```bash
+$ fast-task my-issues
+🔍 Fetching your assigned issues...
+Found 3 issue(s):
+
+WEB-42  | In Progress | Fix responsive layout on mobile | https://company.atlassian.net/browse/WEB-42
+WEB-57  | To Do       | Add dark mode support           | https://company.atlassian.net/browse/WEB-57
+API-103 | In Review   | Refactor auth middleware        | https://company.atlassian.net/browse/API-103
+```
+
+Доступные флаги:
+- `--project <KEY>` — фильтр по конкретному проекту
+- `--all` — включить завершённые задачи (по умолчанию показываются только активные)
+
+```bash
+# Только задачи проекта WEB
+$ fast-task my-issues --project WEB
+
+# Все задачи, включая завершённые
+$ fast-task my-issues --all
+
+# Комбинация флагов
+$ fast-task my-issues --project WEB --all
 ```
 
 ### Создание задачи
