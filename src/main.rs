@@ -8,13 +8,17 @@ use validator::{ValidateEmail, ValidateUrl};
 
 mod config;
 mod jira_client;
+mod jql;
 
 use config::Config;
 use jira_client::JiraClient;
 
 use crate::{
     config::{CONFIG_PATH, LoadConfigError, load_config, save_config},
-    jira_client::{create_issue, get_project_issue_types, test_connection},
+    jira_client::{
+        IssueStatusFilter, MyIssuesQuery, create_issue, get_my_issues, get_project_issue_types,
+        test_connection,
+    },
 };
 
 #[derive(Parser)]
@@ -39,6 +43,16 @@ enum Commands {
     Test,
     /// Create a new issue
     Create,
+    /// List issues assigned to you
+    MyIssues {
+        /// Filter by project key
+        #[arg(short, long)]
+        project: Option<String>,
+
+        /// Include done/closed issues
+        #[arg(long)]
+        all: bool,
+    },
 }
 
 #[derive(Debug, Error)]
@@ -102,6 +116,45 @@ async fn main() {
                     println!("💡 Check your configuration:");
                     println!("   - URL: {}", config.jira_url);
                     println!("   - Email: {}", config.email);
+                }
+            }
+        }
+
+        Commands::MyIssues { project, all } => {
+            if !config.is_configured() {
+                println!("❌ Please configure Jira connection first:");
+                println!("fast-task config");
+                return;
+            }
+
+            let query = MyIssuesQuery {
+                status_filter: if all {
+                    IssueStatusFilter::All
+                } else {
+                    IssueStatusFilter::ActiveOnly
+                },
+                project,
+            };
+
+            println!("🔍 Fetching your assigned issues...");
+            match get_my_issues(&JiraClient::new(&config), &query).await {
+                Ok(issues) if issues.is_empty() => {
+                    println!("No issues found.");
+                }
+                Ok(issues) => {
+                    println!("Found {} issue(s):\n", issues.len());
+                    for issue in &issues {
+                        println!(
+                            "{} | {} | {} | {}",
+                            issue.key,
+                            issue.fields.status.name,
+                            issue.fields.summary,
+                            config.issue_url(&issue.key)
+                        );
+                    }
+                }
+                Err(e) => {
+                    println!("❌ Failed to fetch issues: {}", e);
                 }
             }
         }
